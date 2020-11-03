@@ -1,4 +1,5 @@
 import struct
+from RBytes import RBytes
 
 def int_byte(number:int):
     
@@ -139,6 +140,56 @@ def varlong_int(number:bytes)->int:
 
     return to_return
 
+X_Z_OFFSET = RBytes(b'\x03\xff\xff\xff')
+Y_OFFSET = RBytes(b'\x0f\xff')
+
+
+def position(x:int,y:int,z:int)->RBytes:
+    '''encodes ints to position'''
+    global X_Z_OFFSET, Y_OFFSET  
+    
+    if x > 33554431 or x<-33554432:
+        raise Exception('X must be between -33554432 and 33554431')
+    elif z > 33554431 or z < -33554432:
+        raise Exception('Z must be between -33554432 and 33554431')
+    elif y > 2047 or y < -2048:
+        raise Exception('Y must be between -2049 and 2048')
+
+    x = RBytes(struct.pack('>q',x))
+    z = RBytes(struct.pack('>i',z))
+    y = RBytes(struct.pack('>h',y))
+
+    to_return = ((x & X_Z_OFFSET)<<38) | ((z & X_Z_OFFSET).unsized_lshift(12)) | (y & Y_OFFSET)
+    
+    return to_return
+
+def decode_position(input:RBytes)->tuple:
+    '''decodes array 64 bits into x,y,z'''
+    x = struct.unpack('>i',bytes((input >> 38))[-4:])[0]
+           
+    if x >= 2**25:
+        x -= 2**26
+            
+    y = struct.unpack('>h',bytes((input & Y_OFFSET)[-2:]))[0]
+    if y >= 2**11:
+        y -= 2**12
+
+    z = struct.unpack('>i',bytes((input<<26)>>38)[-4:])[0]
+    if z >= 2**25:
+        z -= 2**26
+
+    return x,y,z
+
+def fixed_point(number:float):
+    '''converts to fixed point number representation'''
+    conv = int(number * 32)
+    return struct.pack('i',conv)
+
+
+def fixed2float(number:bytes):
+    '''converts fixed_point to float'''
+    unpacked = struct.unpack('i',number)[0]
+    return unpacked/32
 
 
 
@@ -151,6 +202,18 @@ if __name__ == '__main__':
     data = varlong(2147483647)
     print(data)
     data = varlong_int(data)
+    print(data)
+
+    data = position(33554431,-2048,33554431)
+    print(data)
+
+    data = decode_position(data)
+    print(data)
+
+    data = fixed_point(70.78125)
+    print(data)
+
+    data = fixed2float(data)
     print(data)
 
 
